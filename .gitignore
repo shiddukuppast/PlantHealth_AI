@@ -1,3 +1,11 @@
 Dataset/
 PlantVillage/
 PestDataset/
+.env
+__pycache__/
+*.pyc
+venv/
+.venv/
+models/*.h5
+models/*.keras
+backend/Models/

@@ -1,0 +1,2 @@
+"""Database model type definitions."""
+

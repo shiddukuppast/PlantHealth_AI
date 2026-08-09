@@ -1,19 +1,22 @@
-export const AUTH_KEY = 'plantguard-session'
+import { AuthResponse, getCurrentUser, login, logout, signup } from '@/lib/api'
 
-export type Session = { email: string; name: string }
-
-export function getSession(): Session | null {
-  if (typeof window === 'undefined') return null
-  const value = window.sessionStorage.getItem(AUTH_KEY)
-  return value ? JSON.parse(value) : null
+export async function signIn(email: string, password: string): Promise<AuthResponse> {
+  return login(email, password)
 }
 
-export function signIn(email: string, name?: string) {
-  const session = { email, name: name?.trim() || email.split('@')[0] }
-  window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(session))
-  return session
+export async function signUp(name: string, email: string, password: string): Promise<AuthResponse> {
+  return signup(name, email, password)
 }
 
-export function signOut() {
-  window.sessionStorage.removeItem(AUTH_KEY)
+export async function getSession() {
+  try {
+    return await getCurrentUser()
+  } catch {
+    return null
+  }
 }
+
+export async function signOut() {
+  await logout()
+}
+

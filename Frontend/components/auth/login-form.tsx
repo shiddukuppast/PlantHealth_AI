@@ -2,9 +2,10 @@
 
 import { FormEvent, useState } from 'react'
 import { Eye, EyeOff, Leaf, LockKeyhole, Mail, Sprout } from 'lucide-react'
+import { ApiError } from '@/lib/api'
 import { signIn } from '@/lib/auth'
 
-export function LoginForm({ onSuccess }: { onSuccess: (email: string) => void }) {
+export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -12,13 +13,21 @@ export function LoginForm({ onSuccess }: { onSuccess: (email: string) => void })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError('Enter a valid email address.')
     if (!password) return setError('Enter your password.')
     setError('')
     setLoading(true)
-    window.setTimeout(() => { signIn(email); onSuccess(email) }, 550)
+    try {
+      await signIn(email, password)
+      onSuccess()
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message)
+      else setError('Unable to sign in right now. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

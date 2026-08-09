@@ -2,9 +2,10 @@
 
 import { FormEvent, useState } from 'react'
 import { Eye, EyeOff, Leaf, LockKeyhole, Mail, Sprout, User } from 'lucide-react'
-import { signIn } from '@/lib/auth'
+import { ApiError } from '@/lib/api'
+import { signUp } from '@/lib/auth'
 
-export function SignupForm({ onSuccess }: { onSuccess: (email: string) => void }) {
+export function SignupForm({ onSuccess }: { onSuccess: () => void }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -12,14 +13,22 @@ export function SignupForm({ onSuccess }: { onSuccess: (email: string) => void }
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim()) return setError('Enter your name.')
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError('Enter a valid email address.')
     if (password.length < 8) return setError('Password must be at least 8 characters.')
     setError('')
     setLoading(true)
-    window.setTimeout(() => { signIn(email, name); onSuccess(email) }, 550)
+    try {
+      await signUp(name.trim(), email, password)
+      onSuccess()
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message)
+      else setError('Unable to create account right now. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
