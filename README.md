@@ -115,128 +115,166 @@ The current application allows users to:
 - Store prediction history
 - Manage user accounts
 
-### 🛠 Technologies Used
-AI / ML
-Python
-TensorFlow
-Keras
-CNN
-NumPy
-Image Preprocessing
-Backend
-Python
-FastAPI
-MongoDB
-Frontend
-Next.js
-React
-Development
-Git
-GitHub
+## 🛠️ Technologies Used
 
-AI-Assisted Development Tools
-🤖 AI-Assisted Development
+### 🤖 AI / Machine Learning
 
-AI-assisted development tools were used to help with parts of the application development, particularly:
+* Python
+* TensorFlow
+* Keras
+* Convolutional Neural Networks (CNN)
+* NumPy
+* Image Preprocessing
+* Deep Learning
 
-Frontend development
-Backend implementation
-API integration
-UI development
-Debugging and development assistance
+### ⚙️ Backend
 
-The primary technical focus of this project was the Machine Learning pipeline and its integration into a functional application.
+* Python
+* FastAPI
+* MongoDB
 
+### 💻 Frontend
 
-▶️ How to Run
-Clone the repository
-git clone https://github.com/shiddukuppast/PlantHealth_AI
-Navigate to the project
-cd cd PlantHealth_AI
+* Next.js
+* React
 
+### 🔧 Development & Version Control
 
-Backend Setup
+* Git
+* GitHub
+
+---
+
+## 🤖 AI-Assisted Development
+
+AI-assisted development tools were used during the development of the application to support various aspects of the software engineering process, including:
+
+* Frontend development
+* Backend implementation
+* API integration
+* UI development
+* Debugging and troubleshooting
+* Development assistance
+
+The **primary technical focus of the project was the Machine Learning pipeline**, including model training, image preprocessing, prediction, and integration of the trained model into a full-stack application.
+
+---
+
+## ▶️ How to Run
+
+### 1️⃣ Clone the Repository
+
+```bash
+git clone https://github.com/shiddukuppast/PlantHealth_AI.git
+cd PlantHealth_AI
+```
+
+### 2️⃣ Backend Setup
+
+Navigate to the backend directory:
+
+```bash
 cd backend
+```
 
 Create a virtual environment:
 
+```bash
 python -m venv .venv
+```
 
-Activate the environment on Windows:
+Activate the virtual environment on Windows:
 
+```bash
 .venv\Scripts\activate
+```
 
-Install dependencies:
+Install the required dependencies:
 
+```bash
 pip install -r requirements.txt
+```
 
 Start the FastAPI server:
 
+```bash
 uvicorn app.main:app --reload
+```
 
+The backend will start on the local development server.
 
-Frontend Setup
+### 3️⃣ Frontend Setup
 
-Open another terminal:
+Open another terminal and navigate to the frontend directory:
 
+```bash
 cd frontend
+```
 
-Install dependencies:
+Install the dependencies:
 
+```bash
 npm install
+```
 
-Start the development server:
+Start the Next.js development server:
 
+```bash
 npm run dev
+```
 
 The application will be available at:
 
-http://localhost:3000
+**http://localhost:3000**
 
+---
 
-🔮 Version 2 – Future Improvements
+## 🔮 Version 2 – Future Improvements
 
-PlantGuard AI is currently at Version 1.
+PlantGuard AI is currently in **Version 1**. The following improvements are planned for future versions:
 
-Several ideas are planned for the next version:
+* 📈 Improve model accuracy
+* 🌱 Add more plant disease classes
+* 📷 Improve performance on real-world images
+* 🎯 Improve prediction confidence calibration
+* 💡 Provide more intelligent treatment recommendations
+* 📊 Add plant health analytics
+* 📱 Improve mobile responsiveness and support
+* 🛰️ Integrate satellite imagery
+* 🌾 Add crop health monitoring
+* 🛰️ Explore NDVI-based crop health analysis
+* ⚡ Improve overall application performance
 
-Improve model accuracy
-Add more plant disease classes
-Improve real-world image performance
-Improve confidence calibration
-Add more intelligent recommendations
-Add plant health analytics
-Add mobile-friendly support
-Integrate satellite imagery
-Add crop health monitoring
-Explore NDVI-based analysis
-Improve overall application performance
+---
 
+## 📌 Current Limitations
 
-📌 Current Limitations
-Version 1 supports a limited number of plant disease classes.
-Model performance may vary with real-world images that differ from the training dataset.
-High confidence does not guarantee a correct prediction.
-Treatment information is provided for informational purposes and should not replace professional agricultural advice.
+* Version 1 supports a limited number of plant disease classes.
+* Model performance may vary when images differ significantly from the training dataset.
+* A high-confidence prediction does not guarantee that the prediction is correct.
+* Treatment and disease information is provided for **informational purposes only** and should not replace professional agricultural advice.
 
+---
 
-📚 What I Learned
+## 📚 What I Learned
 
-This project helped me gain practical experience in:
+Working on PlantGuard AI helped me gain practical experience in:
 
-CNN-based image classification
-Deep Learning
-Image preprocessing
-Model training
-Model evaluation
-Prediction probabilities
-ML model integration
-FastAPI
-MongoDB
-Next.js
-React
-AI-assisted development
-Building an end-to-end AI application
+* 🧠 CNN-based image classification
+* 🤖 Deep Learning
+* 🖼️ Image preprocessing
+* 🏋️ Model training
+* 📊 Model evaluation
+* 🎯 Prediction probability analysis
+* 🔗 Machine Learning model integration
+* ⚡ FastAPI backend development
+* 🗄️ MongoDB database integration
+* ⚛️ Next.js and React development
+* 🔌 Frontend–backend API integration
+* 🧰 Git and GitHub
+* 🤖 AI-assisted software development
+* 🚀 Building an end-to-end AI-powered application
+
 
 
 👨‍💻 Author
