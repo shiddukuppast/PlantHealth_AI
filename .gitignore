@@ -6,6 +6,3 @@ __pycache__/
 *.pyc
 venv/
 .venv/
-models/*.h5
-models/*.keras
-backend/Models/
