@@ -82,6 +82,7 @@ Pepper Bell – Bacterial Spot
 
 Confidence:
 99.9%
+```
 
 The confidence score represents the model's prediction probability for the selected class and should not be confused with the overall model accuracy.
 
