@@ -10,6 +10,7 @@ from app.core.database import close_mongo_connection, connect_to_mongo, is_conne
 from app.routes.auth_route import router as auth_router
 from app.routes.ml_route import router as ml_router
 from app.routes.user_route import router as user_router
+from app.routes.weather_route import router as weather_router
 from app.services import model_service
 
 
@@ -55,6 +56,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "database": "connected" if is_connected() else "disconnected",
+        "model_loaded": model_service.is_loaded(),
         "model": "loaded" if model_service.is_loaded() else "not_loaded",
     }
 
@@ -62,4 +64,4 @@ async def health() -> dict:
 app.include_router(auth_router)
 app.include_router(ml_router)
 app.include_router(user_router)
-
+app.include_router(weather_router)

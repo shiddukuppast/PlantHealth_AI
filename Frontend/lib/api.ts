@@ -13,14 +13,45 @@ export type AuthResponse = {
   token_type: string
 }
 
+export type WeatherContext = {
+  available: boolean
+  temperature?: number | null
+  feels_like?: number | null
+  condition?: string | null
+  humidity?: number | null
+  rainfall?: number | null
+  wind_speed?: number | null
+  cloud_coverage?: number | null
+  location?: string | null
+  country?: string | null
+  icon?: string | null
+}
+
 export type Prediction = {
-  disease: string
+  type: 'Disease' | 'Pest' | string
+  class_name: string
   confidence: number
-  description?: string
-  symptoms?: string
-  treatment?: string
-  prevention?: string
-  recommendations?: string
+  low_confidence: boolean
+  input_valid: boolean
+  rejection_reason: string | null
+  message: string | null
+  ai_guidance: {
+    summary: string
+    symptoms: string[]
+    recommended_actions: string[]
+    prevention: string[]
+    severity: string
+    when_to_seek_expert_help: string
+    weather_insight?: string | null
+  } | null
+  weather_context?: WeatherContext | null
+  weather_insight?: string | null
+  llm_available: boolean
+  description: string
+  symptoms: string
+  treatment: string
+  prevention: string
+  recommendations: string
 }
 
 export type PredictionHistoryItem = {
@@ -29,6 +60,16 @@ export type PredictionHistoryItem = {
   confidence: number
   filename: string
   created_at: string
+}
+
+export type Weather = {
+  location: string
+  country: string
+  temperature: number
+  feels_like: number
+  condition: string
+  humidity: number
+  icon: string
 }
 
 type ApiErrorShape = {
@@ -99,13 +140,19 @@ export async function predictDisease(file: File): Promise<Prediction> {
   const formData = new FormData()
   formData.append('file', file)
   const data = await request<{
-    prediction?: string
-    disease?: string
-    class?: string
-    label?: string
-    confidence?: number
-    score?: number
-    probability?: number
+    prediction?: {
+      type?: string
+      class_name?: string
+      confidence?: number
+      low_confidence?: boolean
+    }
+    input_valid?: boolean
+    rejection_reason?: string | null
+    message?: string | null
+    ai_guidance?: Prediction['ai_guidance']
+    weather_context?: WeatherContext | null
+    weather_insight?: string | null
+    llm_available?: boolean
     description?: string
     symptoms?: string
     treatment?: string
@@ -116,20 +163,55 @@ export async function predictDisease(file: File): Promise<Prediction> {
     body: formData,
   })
 
-  const disease = data.prediction ?? data.disease ?? data.class ?? data.label
-  const rawConfidence = data.confidence ?? data.score ?? data.probability
-  if (typeof disease !== 'string' || typeof rawConfidence !== 'number') {
+  const result = data.prediction
+  if (data.input_valid === false) {
+    return {
+      type: '',
+      class_name: '',
+      confidence: 0,
+      low_confidence: false,
+      input_valid: false,
+      rejection_reason: data.rejection_reason ?? 'low_confidence',
+      message: data.message ?? 'Please upload a clear image of a plant leaf suitable for analysis.',
+      ai_guidance: null,
+      weather_context: null,
+      weather_insight: null,
+      llm_available: false,
+      description: '',
+      symptoms: '',
+      treatment: '',
+      prevention: '',
+      recommendations: '',
+    }
+  }
+
+  if (
+    !result ||
+    typeof result.type !== 'string' ||
+    typeof result.class_name !== 'string' ||
+    typeof result.confidence !== 'number' ||
+    typeof result.low_confidence !== 'boolean'
+  ) {
     throw new ApiError('Invalid prediction response.', 500)
   }
 
   return {
-    disease: disease.replaceAll('___', ' · ').replaceAll('_', ' '),
-    confidence: rawConfidence > 1 ? rawConfidence / 100 : rawConfidence,
-    description: data.description,
-    symptoms: data.symptoms,
-    treatment: data.treatment,
-    prevention: data.prevention,
-    recommendations: data.recommendations,
+    type: result.type,
+    class_name: result.class_name.replaceAll('___', ' · ').replaceAll('_', ' '),
+    confidence: result.confidence,
+    low_confidence: result.low_confidence,
+    input_valid: true,
+    rejection_reason: data.rejection_reason ?? null,
+    message: data.message ?? null,
+    ai_guidance: data.ai_guidance ?? null,
+    weather_context: data.weather_context ?? null,
+    weather_insight: data.weather_insight ?? data.ai_guidance?.weather_insight ?? null,
+    llm_available: data.llm_available === true,
+    description: data.description ?? '',
+    symptoms: data.symptoms ?? '',
+    treatment: data.treatment ?? '',
+    prevention: data.prevention ?? '',
+    recommendations: data.recommendations ?? '',
   }
 }
 
@@ -138,3 +220,7 @@ export async function getPredictionHistory(): Promise<PredictionHistoryItem[]> {
   return response.data
 }
 
+export async function fetchWeather(): Promise<Weather | null> {
+  const data = await request<Weather & { success: boolean }>('/weather')
+  return data.success ? data : null
+}
