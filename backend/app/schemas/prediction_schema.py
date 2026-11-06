@@ -26,11 +26,17 @@ class WeatherContext(BaseModel):
 
 class PredictionGuidance(BaseModel):
     summary: str
-    symptoms: list[str]
-    recommended_actions: list[str]
-    prevention: list[str]
+    disease_overview: str | None = None
+    symptoms: list[str] = []
+    possible_causes: list[str] = []
     severity: str
-    when_to_seek_expert_help: str
+    severity_explanation: str | None = None
+    immediate_actions: list[str] = []
+    treatment_recommendations: list[str] = []
+    prevention: list[str] = []
+    farmer_advisory: str | None = None
+    recommended_actions: list[str] = []
+    when_to_seek_expert_help: str | None = None
     weather_insight: str | None = None
 
 

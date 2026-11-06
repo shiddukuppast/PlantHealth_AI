@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent, DragEvent, useEffect, useId, useRef, useState } from 'react'
+import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Activity,
@@ -13,7 +13,6 @@ import {
   CloudRain,
   Compass,
   Droplets,
-  Globe,
   HeartPulse,
   History,
   Info,
@@ -22,13 +21,13 @@ import {
   RefreshCw,
   RotateCcw,
   ScanLine,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Sprout,
   Sun,
   Upload,
   UserRound,
-  Volume2,
   Wind,
   X,
 } from 'lucide-react'
@@ -45,13 +44,6 @@ import {
 } from '@/lib/api'
 import CameraCapture from '@/components/camera-capture'
 import AnalysisSpeech from '@/components/analysis-speech'
-import {
-  formatFarmerDate,
-  getGreeting,
-  Language,
-  LANGUAGE_OPTIONS,
-  translations,
-} from '@/lib/i18n'
 
 const MAX_SIZE = 10 * 1024 * 1024
 const TYPES = ['image/jpeg', 'image/png']
@@ -93,7 +85,7 @@ function formatConditionName(raw: string): string {
   // 5. Handle healthy ending
   if (/\bhealthy$/i.test(text)) {
     const plant = text.replace(/\bhealthy$/i, '').trim()
-    text = plant ? `${plant} (Healthy)` : 'Healthy'
+    text = plant ? `${plant} (Healthy)` : 'Healthy Crop'
   }
 
   // 6. Title case words cleanly
@@ -144,15 +136,54 @@ function parseBulletList(content: string[] | string | undefined | null): string[
   return []
 }
 
+function formatFarmerDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+function getTodayFormatted(): string {
+  return new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function getWeatherFarmingAdvice(weather: Weather): string {
+  const cond = (weather.condition || '').toLowerCase()
+  const hum = weather.humidity ?? 0
+  const temp = weather.temperature ?? 25
+
+  if (cond.includes('rain') || cond.includes('drizzle') || cond.includes('thunder')) {
+    return 'Rain expected today. Postpone pesticide sprays and fertilizer application to prevent runoff.'
+  }
+  if (hum >= 80) {
+    return 'High humidity levels increase risk of fungal infection. Maintain crop spacing and avoid overhead evening watering.'
+  }
+  if (temp >= 35) {
+    return 'High temperatures may cause moisture stress. Irrigate early in the morning or late evening.'
+  }
+  if (temp <= 14) {
+    return 'Cool weather. Inspect crops regularly for morning dew-related fungal or mold growth.'
+  }
+  return 'Favorable field conditions today for crop inspection, weeding, and routine farm management.'
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Language state (English, Kannada, Hindi)
-  const [lang, setLang] = useState<Language>('en')
-  const t = translations[lang]
-
-  // Farmer state
+  // Farmer & user state
   const [name, setName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
@@ -161,7 +192,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [checkingAuth, setCheckingAuth] = useState(true)
 
-  // Weather state
+  // Live Weather state
   const [weather, setWeather] = useState<Weather | null>(null)
   const [weatherLoading, setWeatherLoading] = useState(true)
 
@@ -171,27 +202,6 @@ export default function DashboardPage() {
   // History state
   const [history, setHistory] = useState<PredictionHistoryItem[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
-
-  // Load language preference from localStorage
-  useEffect(() => {
-    try {
-      const savedLang = localStorage.getItem('planthealth_lang') as Language
-      if (savedLang && (savedLang === 'en' || savedLang === 'kn' || savedLang === 'hi')) {
-        setLang(savedLang)
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [])
-
-  function changeLanguage(newLang: Language) {
-    setLang(newLang)
-    try {
-      localStorage.setItem('planthealth_lang', newLang)
-    } catch {
-      // Ignore localStorage errors
-    }
-  }
 
   // Load user profile, weather, and diagnosis history
   useEffect(() => {
@@ -326,7 +336,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#fbfdf9] text-stone-900 pb-20">
-      {/* 1. TOP BRANDING & GREETING BAR */}
+      {/* 1. TOP BRANDING BAR */}
       <header className="sticky top-0 z-30 border-b border-emerald-900/10 bg-white/95 backdrop-blur-md shadow-xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
           {/* Logo & Platform Name */}
@@ -337,65 +347,45 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-mono text-lg font-bold tracking-tight text-emerald-950 sm:text-xl">
-                  {t.appName}
+                  PlantHealth AI
                 </span>
                 <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
                   V2
                 </span>
               </div>
-              <p className="hidden text-xs text-stone-500 sm:block">{t.appTagline}</p>
+              <p className="hidden text-xs text-stone-500 sm:block">
+                AI Agricultural Advisory for Farmers
+              </p>
             </div>
           </div>
 
-          {/* Right Header: Weather + Language Switcher + Farmer Profile + Logout */}
+          {/* Right Header: Weather Pill + Farmer Profile + Logout */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Live Weather Pill */}
             {weather && (
               <div className="hidden sm:flex items-center gap-2 rounded-xl border border-emerald-800/10 bg-emerald-50/70 px-3 py-1.5 text-xs text-emerald-950">
-                <Sun className="size-4 text-amber-600" />
+                <Sun className="size-4 text-amber-600 shrink-0" />
                 <span className="font-semibold">{weather.temperature}°C</span>
-                <span className="text-emerald-800/70 truncate max-w-24">{weather.location}</span>
+                <span className="text-emerald-800/70 truncate max-w-28">{weather.location}</span>
               </div>
             )}
 
-            {/* Language Switcher */}
-            <div className="flex items-center rounded-xl border border-emerald-800/15 bg-stone-50 p-0.5 shadow-2xs">
-              <span className="pl-2 pr-1 text-stone-400">
-                <Globe className="size-3.5" />
-              </span>
-              {LANGUAGE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.code}
-                  type="button"
-                  onClick={() => changeLanguage(opt.code)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    lang === opt.code
-                      ? 'bg-emerald-700 text-white shadow-2xs'
-                      : 'text-stone-600 hover:text-emerald-800 hover:bg-emerald-50/80'
-                  }`}
-                  title={opt.label}
-                >
-                  {opt.nativeName}
-                </button>
-              ))}
-            </div>
-
-            {/* Farmer Profile info */}
-            <div className="hidden md:flex items-center gap-2 pl-1 border-l border-stone-200">
-              <span className="flex size-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
-                <UserRound className="size-4" />
+            {/* Farmer Profile Badge */}
+            <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-1.5">
+              <span className="flex size-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+                <UserRound className="size-3.5" />
               </span>
               <div className="text-left text-xs leading-tight">
                 <p className="font-semibold text-stone-800 max-w-28 truncate">{name || 'Farmer'}</p>
-                <p className="text-[10px] text-stone-500">{t.farmerWorkspace}</p>
+                <p className="text-[10px] text-stone-500">Active Member</p>
               </div>
             </div>
 
             {/* Logout Button */}
             <button
               onClick={logoutUser}
-              aria-label={t.logout}
-              title={t.logout}
+              aria-label="Log Out"
+              title="Log Out"
               className="flex size-9 items-center justify-center rounded-xl text-stone-500 transition hover:bg-stone-100 hover:text-red-700 cursor-pointer"
             >
               <LogOut className="size-4" />
@@ -404,65 +394,57 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* 2. WELCOME BANNER FOR FARMERS */}
-      <section className="border-b border-emerald-900/5 bg-gradient-to-b from-emerald-50/60 to-transparent py-6 sm:py-8">
+      {/* SECTION 1: WELCOME & FARMER GREETING */}
+      <section className="border-b border-emerald-900/5 bg-gradient-to-b from-emerald-50/70 to-transparent py-6 sm:py-8">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <p className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-emerald-800">
-                🌱 {getGreeting(lang)}{name ? `, ${name}` : ''}!
+                🌱 Namaste{name ? `, ${name}` : ''}!
               </p>
               <h1 className="mt-1 font-mono text-2xl sm:text-3xl font-bold tracking-tight text-emerald-950">
-                {t.welcomeBack}
+                Welcome to Your Farm Dashboard
               </h1>
               <p className="mt-1 text-sm text-stone-600 sm:text-base leading-relaxed">
-                {t.welcomeSubtitle}
+                Healthy crops lead to prosperous harvests. Check your crop leaves regularly for early disease detection.
               </p>
             </div>
 
-            {/* Weather Quick Status on Mobile */}
-            {weather && (
-              <div className="flex sm:hidden items-center gap-3 rounded-2xl border border-emerald-800/15 bg-white p-3 shadow-2xs">
-                <Sun className="size-6 text-amber-500 shrink-0" />
-                <div className="text-xs">
-                  <span className="font-bold text-stone-800">{weather.temperature}°C · {weather.condition}</span>
-                  <p className="text-stone-500">{weather.location}</p>
-                </div>
-              </div>
-            )}
+            <div className="self-start sm:self-auto rounded-2xl border border-emerald-800/15 bg-white px-4 py-2.5 shadow-2xs">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Today</p>
+              <p className="text-sm font-semibold text-stone-800">{getTodayFormatted()}</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 3. MAIN DASHBOARD CONTENT */}
+      {/* MAIN DASHBOARD CONTENT */}
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 space-y-8">
         {!prediction ? (
           <>
-            {/* HERO CARD: CROP HEALTH CHECK (PRIMARY FEATURE) */}
+            {/* SECTION 3: CROP HEALTH SCANNER (PRIMARY PROMINENT FEATURE) */}
             <section
-              aria-labelledby="check-crop-health-title"
-              className="overflow-hidden rounded-3xl border-2 border-emerald-600/20 bg-white p-6 sm:p-8 shadow-sm transition hover:border-emerald-600/30"
+              aria-labelledby="scanner-heading"
+              className="overflow-hidden rounded-3xl border-2 border-emerald-600/25 bg-white p-6 sm:p-8 shadow-sm transition hover:border-emerald-600/40"
             >
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-xs">
-                    <HeartPulse className="size-6" />
-                  </span>
-                  <div>
-                    <h2
-                      id="check-crop-health-title"
-                      className="font-mono text-xl sm:text-2xl font-bold text-emerald-950 tracking-tight"
-                    >
-                      {t.checkHealthTitle}
-                    </h2>
-                    <p className="mt-1 text-sm sm:text-base text-stone-600 leading-relaxed max-w-2xl">
-                      {t.checkHealthSubtitle}
-                    </p>
-                  </div>
+              <div className="flex items-start gap-4">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white shadow-xs">
+                  <HeartPulse className="size-6" />
+                </span>
+                <div>
+                  <h2
+                    id="scanner-heading"
+                    className="font-mono text-xl sm:text-2xl font-bold text-emerald-950 tracking-tight"
+                  >
+                    Check Your Crop Health
+                  </h2>
+                  <p className="mt-1 text-sm sm:text-base text-stone-600 leading-relaxed max-w-2xl">
+                    Take a photo or upload an image of an affected leaf to receive instant AI diagnosis, severity assessment, and practical agricultural treatment.
+                  </p>
                 </div>
               </div>
 
-              {/* Action Buttons: Scan using Camera or Upload from Gallery */}
+              {/* Action Buttons: Take Photo or Upload Image */}
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
@@ -473,7 +455,7 @@ export default function DashboardPage() {
                   className="flex min-h-13 items-center justify-center gap-2.5 rounded-2xl bg-emerald-700 px-6 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
                 >
                   <Camera className="size-5" />
-                  <span>{t.scanCamera}</span>
+                  <span>Take Photo with Camera</span>
                 </button>
 
                 <button
@@ -482,7 +464,7 @@ export default function DashboardPage() {
                   className="flex min-h-13 items-center justify-center gap-2.5 rounded-2xl border-2 border-emerald-800/25 bg-white px-6 text-base font-semibold text-emerald-900 transition hover:bg-emerald-50 active:scale-[0.99] cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
                 >
                   <Upload className="size-5 text-emerald-700" />
-                  <span>{t.uploadImage}</span>
+                  <span>Upload from Gallery</span>
                 </button>
               </div>
 
@@ -511,7 +493,7 @@ export default function DashboardPage() {
                         className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-200 cursor-pointer"
                       >
                         <RotateCcw className="size-3.5" />
-                        {t.retake}
+                        Retake Photo
                       </button>
                       <button
                         type="button"
@@ -519,7 +501,7 @@ export default function DashboardPage() {
                         className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-red-700 cursor-pointer"
                       >
                         <X className="size-3.5" />
-                        {t.removePhoto}
+                        Remove
                       </button>
                     </div>
                   </div>
@@ -529,20 +511,20 @@ export default function DashboardPage() {
                       <Leaf className="size-7" />
                     </span>
                     <h3 className="font-mono text-base sm:text-lg font-bold text-stone-900">
-                      {t.checkHealthTitle}
+                      Ready to inspect your crop
                     </h3>
                     <p className="mt-1 text-xs sm:text-sm text-stone-500">
-                      {t.orDragDrop}
+                      Drag and drop a clear plant leaf photo here, or browse your files
                     </p>
                     <button
                       type="button"
                       onClick={() => inputRef.current?.click()}
                       className="mt-4 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-emerald-800 transition cursor-pointer"
                     >
-                      {t.browseImage}
+                      Browse Files
                     </button>
                     <p className="mt-3 text-[11px] text-stone-500">
-                      {t.supportedFormats}
+                      Supports JPG, JPEG, and PNG files up to 10 MB
                     </p>
                   </>
                 )}
@@ -556,29 +538,29 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Farmer Photo Tips */}
+              {/* Photo Tips Card */}
               <div className="mt-5 rounded-2xl border border-emerald-800/10 bg-emerald-50/50 p-4">
                 <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-900">
                   <Sparkles className="size-4 text-emerald-700" />
-                  {t.photoTipsTitle}
+                  Tips for Best AI Diagnosis Results
                 </p>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3 text-xs text-stone-700">
                   <div className="flex items-start gap-2">
                     <span className="text-emerald-700 font-bold">✓</span>
-                    <span>{t.photoTip1}</span>
+                    <span><strong>Good Light:</strong> Take photo in bright daylight. Avoid dark shadows.</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-emerald-700 font-bold">✓</span>
-                    <span>{t.photoTip2}</span>
+                    <span><strong>Sharp Focus:</strong> Keep camera steady. Focus directly on the affected leaf.</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-emerald-700 font-bold">✓</span>
-                    <span>{t.photoTip3}</span>
+                    <span><strong>Close View:</strong> Fill frame with leaf surface showing visible spots or symptoms.</span>
                   </div>
                 </div>
               </div>
 
-              {/* Big Analyze Button */}
+              {/* Prominent Analyze Button */}
               {file && (
                 <button
                   type="button"
@@ -589,12 +571,12 @@ export default function DashboardPage() {
                   {busy ? (
                     <>
                       <span className="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      <span>{t.analyzingButton}</span>
+                      <span>Analyzing leaf with AI...</span>
                     </>
                   ) : (
                     <>
                       <ScanLine className="size-5" />
-                      <span>{t.analyzeButton}</span>
+                      <span>Analyze Crop Leaf Now</span>
                     </>
                   )}
                 </button>
@@ -612,9 +594,9 @@ export default function DashboardPage() {
               )}
             </section>
 
-            {/* LIVE WEATHER & FIELD ADVISORY SECTION */}
+            {/* SECTION 2: CURRENT WEATHER & FARMING ADVISORY */}
             <section
-              aria-labelledby="weather-advisory-title"
+              aria-labelledby="weather-heading"
               className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs"
             >
               <div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-4">
@@ -623,14 +605,11 @@ export default function DashboardPage() {
                     <Sun className="size-5" />
                   </span>
                   <div>
-                    <h3
-                      id="weather-advisory-title"
-                      className="font-mono text-lg font-bold text-stone-900"
-                    >
-                      {t.weatherTitle}
+                    <h3 id="weather-heading" className="font-mono text-lg font-bold text-stone-900">
+                      Live Weather & Field Advisory
                     </h3>
                     <p className="text-xs text-stone-500">
-                      {weather ? `${weather.location}, ${weather.country}` : t.weatherContextNote}
+                      {weather ? `${weather.location}, ${weather.country}` : 'Environmental context for your farm'}
                     </p>
                   </div>
                 </div>
@@ -638,67 +617,78 @@ export default function DashboardPage() {
 
               {weatherLoading ? (
                 <div className="py-8 text-center text-sm text-stone-500 animate-pulse">
-                  {t.weatherLoading}
+                  Fetching current weather conditions...
                 </div>
               ) : weather ? (
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {/* Temperature */}
-                  <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                      {t.temp}
-                    </span>
-                    <p className="mt-1 font-mono text-2xl font-bold text-stone-900">
-                      {weather.temperature}°C
-                    </p>
-                    <p className="text-xs text-stone-500 mt-0.5">
-                      {t.feelsLike} {weather.feels_like}°C
-                    </p>
+                <div className="mt-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {/* Temperature */}
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                        Temperature
+                      </span>
+                      <p className="mt-1 font-mono text-2xl font-bold text-stone-900">
+                        {weather.temperature}°C
+                      </p>
+                      <p className="text-xs text-stone-500 mt-0.5">
+                        Feels like {weather.feels_like}°C
+                      </p>
+                    </div>
+
+                    {/* Conditions */}
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                        Condition
+                      </span>
+                      <p className="mt-1 font-mono text-lg font-bold text-emerald-950 truncate">
+                        {weather.condition}
+                      </p>
+                      <p className="text-xs text-stone-500 mt-0.5">Sky & Atmosphere</p>
+                    </div>
+
+                    {/* Humidity */}
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                        Relative Humidity
+                      </span>
+                      <p className="mt-1 font-mono text-2xl font-bold text-stone-900">
+                        {weather.humidity}%
+                      </p>
+                      <p className="text-xs text-stone-500 mt-0.5">Air Moisture Level</p>
+                    </div>
+
+                    {/* Field Spray Safety */}
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                        Field Spray Status
+                      </span>
+                      <p className="mt-1 font-mono text-lg font-bold text-stone-900">
+                        {weather.condition.toLowerCase().includes('rain') ? 'Spray Alert' : 'Safe to Spray'}
+                      </p>
+                      <p className="text-xs text-stone-500 mt-0.5">Field operations</p>
+                    </div>
                   </div>
 
-                  {/* Conditions */}
-                  <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                      Condition
-                    </span>
-                    <p className="mt-1 font-mono text-lg font-bold text-emerald-950 truncate">
-                      {weather.condition}
-                    </p>
-                    <p className="text-xs text-stone-500 mt-0.5">Live condition</p>
-                  </div>
-
-                  {/* Humidity */}
-                  <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                      {t.humidity}
-                    </span>
-                    <p className="mt-1 font-mono text-2xl font-bold text-stone-900">
-                      {weather.humidity}%
-                    </p>
-                    <p className="text-xs text-stone-500 mt-0.5">Air moisture</p>
-                  </div>
-
-                  {/* Wind / Rain */}
-                  <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-4">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                      {t.wind}
-                    </span>
-                    <p className="mt-1 font-mono text-xl font-bold text-stone-900">
-                      {weather.condition.toLowerCase().includes('rain') ? 'Rain alert' : 'Favorable'}
-                    </p>
-                    <p className="text-xs text-stone-500 mt-0.5">Field operations</p>
+                  {/* Practical Weather Advice Banner */}
+                  <div className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/60 p-4 text-xs sm:text-sm text-amber-950">
+                    <Info className="size-5 shrink-0 text-amber-700 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Weather Advisory for Farmers: </span>
+                      <span>{getWeatherFarmingAdvice(weather)}</span>
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="mt-4 rounded-2xl bg-stone-50 p-6 text-center text-sm text-stone-500">
                   <Info className="mx-auto size-5 text-stone-400 mb-1" />
-                  <p>{t.weatherUnavailable}</p>
+                  <p>Weather information is currently unavailable. AI diagnostics will proceed normally.</p>
                 </div>
               )}
             </section>
 
-            {/* RECENT CROP CHECKS (DIAGNOSIS HISTORY) */}
+            {/* SECTION 7: RECENT DIAGNOSIS HISTORY */}
             <section
-              aria-labelledby="recent-history-title"
+              aria-labelledby="history-heading"
               className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs"
             >
               <div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-4">
@@ -707,13 +697,10 @@ export default function DashboardPage() {
                     <History className="size-5" />
                   </span>
                   <div>
-                    <h3
-                      id="recent-history-title"
-                      className="font-mono text-lg font-bold text-stone-900"
-                    >
-                      {t.historyTitle}
+                    <h3 id="history-heading" className="font-mono text-lg font-bold text-stone-900">
+                      Recent Crop Scans
                     </h3>
-                    <p className="text-xs text-stone-500">{t.historySubtitle}</p>
+                    <p className="text-xs text-stone-500">Your past plant health checkups and results</p>
                   </div>
                 </div>
               </div>
@@ -749,7 +736,7 @@ export default function DashboardPage() {
                               {formatted}
                             </h4>
                             <p className="text-xs text-stone-500">
-                              {formatFarmerDate(item.created_at, lang)} · AI confidence: {percent}%
+                              {formatFarmerDate(item.created_at)} · Confidence: {percent}%
                             </p>
                           </div>
                         </div>
@@ -761,7 +748,7 @@ export default function DashboardPage() {
                               : 'bg-amber-50 text-amber-800 border border-amber-200'
                           }`}
                         >
-                          {isHealthy ? t.statusHealthy : t.statusDiagnosed}
+                          {isHealthy ? 'Healthy' : 'Diagnosed'}
                         </span>
                       </div>
                     )
@@ -772,21 +759,20 @@ export default function DashboardPage() {
                   <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-stone-100 text-stone-400 mb-2">
                     <Sprout className="size-6" />
                   </span>
-                  <h4 className="font-semibold text-stone-800 text-sm">{t.historyEmptyTitle}</h4>
+                  <h4 className="font-semibold text-stone-800 text-sm">No scans yet</h4>
                   <p className="mt-1 max-w-md mx-auto text-xs text-stone-500 leading-relaxed">
-                    {t.historyEmptyDesc}
+                    Take a photo of your crop to get started! Your diagnosis history will appear here.
                   </p>
                 </div>
               )}
             </section>
           </>
         ) : (
-          /* DIAGNOSIS RESULT REPORT */
-          <FarmerAnalysisReport
+          /* SECTIONS 4, 5, 6: DIAGNOSIS REPORT & RECOMMENDATIONS */
+          <FarmerDiagnosisReport
             prediction={prediction}
             preview={preview}
             onReset={clear}
-            lang={lang}
           />
         )}
       </div>
@@ -802,21 +788,17 @@ export default function DashboardPage() {
 }
 
 /* ============================================================
- * FARMER-FRIENDLY DIAGNOSIS REPORT COMPONENT
+ * FARMER-FRIENDLY DIAGNOSIS REPORT COMPONENT (SECTIONS 4, 5, 6)
  * ============================================================ */
-function FarmerAnalysisReport({
+function FarmerDiagnosisReport({
   prediction,
   preview,
   onReset,
-  lang,
 }: {
   prediction: Prediction
   preview: string
   onReset: () => void
-  lang: Language
 }) {
-  const t = translations[lang]
-
   // If leaf image was not suitable for analysis
   if (!prediction.input_valid) {
     return (
@@ -824,15 +806,15 @@ function FarmerAnalysisReport({
         <div className="flex flex-col items-center text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-1.5 text-xs font-bold text-amber-900">
             <AlertTriangle className="size-4 text-amber-700" />
-            {t.invalidImageTitle}
+            Image Not Recognized
           </span>
 
           <h2 className="mt-4 font-mono text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-            {t.invalidImageSubtitle}
+            Please Upload a Clear Leaf Photo
           </h2>
 
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
-            {prediction.message || 'Please upload a clear image of a plant leaf so the AI can inspect it.'}
+            {prediction.message || 'We could not detect a valid crop leaf in this picture. Please capture a clear image of the leaf surface.'}
           </p>
 
           {preview && (
@@ -849,20 +831,20 @@ function FarmerAnalysisReport({
 
           <div className="mt-6 rounded-2xl border border-stone-200 bg-stone-50/80 p-5 text-left max-w-md w-full">
             <p className="text-xs font-bold uppercase tracking-wider text-stone-700 mb-2">
-              {t.photoTipsTitle}
+              Tips for Better Results
             </p>
             <ul className="space-y-2 text-xs sm:text-sm text-stone-600">
               <li className="flex items-start gap-2">
                 <span className="text-emerald-700 font-bold">•</span>
-                <span>{t.invalidTip1}</span>
+                <span>Focus on a single affected plant leaf</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-emerald-700 font-bold">•</span>
-                <span>{t.invalidTip2}</span>
+                <span>Take the photo in bright daylight</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-emerald-700 font-bold">•</span>
-                <span>{t.invalidTip3}</span>
+                <span>Avoid blurry, distant, or shadowed photos</span>
               </li>
             </ul>
           </div>
@@ -873,7 +855,7 @@ function FarmerAnalysisReport({
               className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-7 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 transition cursor-pointer"
             >
               <RotateCcw className="size-4" />
-              <span>{t.tryAgain}</span>
+              <span>Try Another Photo</span>
             </button>
           </div>
         </div>
@@ -889,41 +871,63 @@ function FarmerAnalysisReport({
   // Human confidence explanation for farmers
   const confidenceExplanation =
     percent >= 80
-      ? t.confidenceHigh
+      ? 'High confidence: The AI clearly identified distinctive leaf patterns matching this condition.'
       : percent >= 60
-        ? t.confidenceModerate
-        : t.confidenceLow
+        ? 'Moderate confidence: Characteristic symptoms were detected. Monitor closely to confirm.'
+        : 'Low confidence: The image may be blurry or symptoms are ambiguous. Verify in the field.'
 
   const isLowConfidence = prediction.low_confidence || percent < 60
 
-  // Lists
+  // Severity color indicator
+  const severityVal = (guidance?.severity || 'Medium').toLowerCase()
+  const severityBadge = isHealthy
+    ? { text: 'Low (Healthy)', bg: 'bg-emerald-100 text-emerald-900 border-emerald-300' }
+    : severityVal.includes('high')
+      ? { text: 'High Severity', bg: 'bg-red-100 text-red-900 border-red-300' }
+      : severityVal.includes('low')
+        ? { text: 'Low Severity', bg: 'bg-emerald-100 text-emerald-900 border-emerald-300' }
+        : { text: 'Medium Severity', bg: 'bg-amber-100 text-amber-900 border-amber-300' }
+
+  // Lists from guidance or fallback
   const symptomsList = parseBulletList(
-    guidance ? guidance.symptoms : prediction.symptoms
+    guidance?.symptoms && guidance.symptoms.length > 0 ? guidance.symptoms : prediction.symptoms
   )
-  const actionsList = parseBulletList(
-    guidance
-      ? guidance.recommended_actions
-      : prediction.treatment || prediction.recommendations
+  const causesList = parseBulletList(guidance?.possible_causes)
+  const immediateActionsList = parseBulletList(
+    guidance?.immediate_actions && guidance.immediate_actions.length > 0
+      ? guidance.immediate_actions
+      : guidance?.recommended_actions && guidance.recommended_actions.length > 0
+        ? guidance.recommended_actions
+        : prediction.treatment
+  )
+  const treatmentList = parseBulletList(
+    guidance?.treatment_recommendations && guidance.treatment_recommendations.length > 0
+      ? guidance.treatment_recommendations
+      : prediction.treatment
   )
   const preventionList = parseBulletList(
-    guidance ? guidance.prevention : prediction.prevention
+    guidance?.prevention && guidance.prevention.length > 0 ? guidance.prevention : prediction.prevention
   )
-  const expertNote =
-    guidance?.when_to_seek_expert_help || t.expertAdviceDefault
+  const diseaseOverview =
+    guidance?.disease_overview || guidance?.summary || prediction.description || 'Diagnosis completed.'
+  const severityExplanation =
+    guidance?.severity_explanation || (isHealthy ? 'Crop is healthy with no visible signs of infection.' : 'Manage early to protect crop yield.')
+  const farmerAdvisory =
+    guidance?.farmer_advisory || guidance?.when_to_seek_expert_help || 'For critical crop decisions, visit your nearest Krishi Vigyan Kendra (KVK) or agricultural extension officer.'
 
   return (
-    <article className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 sm:p-10 shadow-sm space-y-6">
-      {/* 1. REPORT HEADER */}
-      <div className="text-center border-b border-stone-100 pb-5">
+    <article className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 sm:p-10 shadow-sm space-y-8">
+      {/* SECTION 4: LATEST DISEASE DIAGNOSIS HEADER */}
+      <div className="text-center border-b border-stone-100 pb-6">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1 text-xs font-bold ${
+          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1 text-xs font-bold border ${
             isHealthy
-              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-              : 'bg-red-100 text-red-900 border border-red-200'
+              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+              : 'bg-red-100 text-red-900 border-red-200'
           }`}
         >
           <CheckCircle2 className="size-3.5" />
-          {isHealthy ? t.healthyCrop : t.diseaseDetected}
+          {isHealthy ? 'Healthy Crop' : 'Disease Detected'}
         </span>
 
         <h2 className="mt-3 font-mono text-2xl sm:text-3xl font-bold tracking-tight text-stone-900">
@@ -931,30 +935,30 @@ function FarmerAnalysisReport({
         </h2>
 
         <p className="mt-1 text-xs sm:text-sm text-stone-500">
-          {t.diagnosisReport}
+          Official AI Plant Health Diagnosis Report
         </p>
       </div>
 
-      {/* 2. LEAF PHOTO + KEY METRICS */}
+      {/* LEAF PHOTO + KEY METRICS & AUDIO PLAYER */}
       <div className="grid gap-6 sm:grid-cols-2 items-center">
-        {/* Leaf image */}
+        {/* Leaf image preview */}
         {preview && (
           <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 p-2 shadow-2xs">
             <img
               src={preview}
               alt="Analyzed leaf specimen"
-              className="max-h-60 sm:max-h-64 w-full rounded-xl object-contain mx-auto"
+              className="max-h-64 sm:max-h-72 w-full rounded-xl object-contain mx-auto"
             />
           </div>
         )}
 
-        {/* Diagnosis overview card */}
+        {/* Diagnostic Metrics & Audio */}
         <div className="space-y-4 rounded-2xl border border-stone-200 bg-stone-50/80 p-5">
           {/* AI Confidence */}
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                {t.confidenceLabel}
+                AI Confidence
               </span>
               <span className="font-mono text-xl font-bold text-emerald-800">
                 {percent}%
@@ -963,152 +967,239 @@ function FarmerAnalysisReport({
             <p className="mt-1 text-xs text-stone-600 leading-relaxed">
               {confidenceExplanation}
             </p>
+            {isLowConfidence && (
+              <p className="mt-1.5 text-xs font-medium text-amber-800 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                ⚠️ Caution: Low confidence. Inspect other leaves in the field or verify with an agricultural expert.
+              </p>
+            )}
           </div>
 
-          {/* Severity if applicable */}
-          {guidance?.severity && (
-            <div className="border-t border-stone-200 pt-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                {t.severityLabel}
-              </span>
-              <p className="mt-0.5 text-sm font-semibold text-stone-800">
-                {guidance.severity}
-              </p>
-            </div>
-          )}
-
-          {/* Audio advice trigger */}
+          {/* Severity Level */}
           <div className="border-t border-stone-200 pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                Disease Severity
+              </span>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${severityBadge.bg}`}>
+                {severityBadge.text}
+              </span>
+            </div>
+            {severityExplanation && (
+              <p className="mt-1 text-xs text-stone-600 leading-relaxed">
+                {severityExplanation}
+              </p>
+            )}
+          </div>
+
+          {/* Audio Advice Playback (AnalysisSpeech) */}
+          <div className="border-t border-stone-200 pt-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-2">
+              Audio Advisory (Listen in English)
+            </p>
             <AnalysisSpeech
               prediction={prediction}
               aiGuidance={guidance}
-              playLabel={t.listenAdvice}
-              speakingLabel={t.speakingAdvice}
-              pauseLabel={t.pauseSpeech}
-              resumeLabel={t.resumeSpeech}
-              stopLabel={t.stopSpeech}
+              playLabel="Listen to Advice"
+              speakingLabel="Playing Advisory..."
+              pauseLabel="Pause"
+              resumeLabel="Resume"
+              stopLabel="Stop"
             />
           </div>
         </div>
       </div>
 
-      {/* 3. AGRICULTURAL INSIGHT */}
-      {(guidance?.summary || prediction.description) && (
-        <div className="rounded-2xl border border-emerald-600/20 bg-emerald-50/40 p-5 sm:p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="size-4 text-emerald-700" />
-            <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-900">
-              {t.aiInsightTitle}
-            </h4>
-          </div>
-          <p className="text-sm sm:text-base leading-relaxed text-stone-800">
-            {guidance?.summary || prediction.description}
-          </p>
+      {/* DISEASE OVERVIEW */}
+      <div className="rounded-2xl border border-emerald-600/20 bg-emerald-50/40 p-5 sm:p-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="size-4 text-emerald-700" />
+          <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-900">
+            Disease Overview & Spread
+          </h4>
         </div>
-      )}
+        <p className="text-sm sm:text-base leading-relaxed text-stone-800">
+          {diseaseOverview}
+        </p>
+        {guidance?.weather_insight && (
+          <div className="mt-3 rounded-xl border border-emerald-700/15 bg-white/80 p-3 text-xs sm:text-sm text-emerald-950">
+            <span className="font-bold">Weather Impact: </span>
+            <span>{guidance.weather_insight}</span>
+          </div>
+        )}
+      </div>
 
-      {/* 4. SYMPTOMS */}
-      {symptomsList.length > 0 && (
+      {/* SYMPTOMS & POSSIBLE CAUSES */}
+      <div className="grid gap-6 sm:grid-cols-2">
+        {/* Symptoms */}
         <div className="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 border-b border-stone-100 pb-2.5">
             <Activity className="size-4 text-emerald-700" />
             <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700">
-              {t.symptomsTitle}
+              Observable Symptoms
             </h4>
           </div>
-          <ul className="space-y-2">
-            {symptomsList.map((symptom, idx) => (
-              <li key={idx} className="flex items-start gap-2.5 text-sm text-stone-800">
-                <span className="size-1.5 rounded-full bg-emerald-600 shrink-0 mt-2" />
-                <span>{symptom}</span>
-              </li>
-            ))}
-          </ul>
+          {symptomsList.length > 0 ? (
+            <ul className="space-y-2">
+              {symptomsList.map((symptom, idx) => (
+                <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-stone-800">
+                  <span className="size-1.5 rounded-full bg-emerald-600 shrink-0 mt-1.5" />
+                  <span>{symptom}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-stone-500">
+              {isHealthy ? 'No visible disease symptoms observed on this leaf.' : 'No detailed symptoms listed.'}
+            </p>
+          )}
         </div>
-      )}
 
-      {/* 5. STRUCTURED TREATMENT: 1. IMMEDIATE ACTIONS */}
-      {actionsList.length > 0 && (
-        <div className="rounded-2xl border-2 border-amber-500/25 bg-amber-50/30 p-5 sm:p-6 space-y-3 shadow-2xs">
-          <div className="border-b border-amber-200/60 pb-2.5">
-            <h4 className="font-mono text-sm sm:text-base font-bold text-amber-950">
-              {t.immediateActionsTitle}
-            </h4>
-            <p className="text-xs text-amber-800/80">{t.immediateActionsSubtitle}</p>
-          </div>
-          <ol className="space-y-2.5">
-            {actionsList.map((action, idx) => (
-              <li
-                key={idx}
-                className="flex items-start gap-3 rounded-xl border border-amber-200/80 bg-white p-3.5 text-sm text-stone-800"
-              >
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white mt-0.5">
-                  {idx + 1}
-                </span>
-                <span className="flex-1 leading-relaxed">{action}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      {/* 6. STRUCTURED TREATMENT: 2. TREATMENT RECOMMENDATIONS */}
-      {prediction.treatment && (
-        <div className="rounded-2xl border border-emerald-600/20 bg-emerald-50/20 p-5 sm:p-6 space-y-3 shadow-2xs">
-          <div className="border-b border-emerald-900/10 pb-2.5">
-            <h4 className="font-mono text-sm sm:text-base font-bold text-emerald-950">
-              {t.treatmentTitle}
-            </h4>
-            <p className="text-xs text-stone-500">{t.treatmentSubtitle}</p>
-          </div>
-          <p className="text-sm leading-relaxed text-stone-800 whitespace-pre-line">
-            {prediction.treatment}
-          </p>
-        </div>
-      )}
-
-      {/* 7. STRUCTURED TREATMENT: 3. PREVENTION METHODS */}
-      {preventionList.length > 0 && (
+        {/* Possible Causes */}
         <div className="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 border-b border-stone-100 pb-2.5">
-            <ShieldCheck className="size-4 text-emerald-700" />
-            <div>
-              <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-stone-800">
-                {t.preventionTitle}
-              </h4>
-              <p className="text-xs text-stone-500">{t.preventionSubtitle}</p>
-            </div>
-          </div>
-          <ul className="space-y-2.5">
-            {preventionList.map((item, idx) => (
-              <li
-                key={idx}
-                className="flex items-start gap-3 rounded-xl border border-stone-100 bg-stone-50/60 p-3 text-sm text-stone-800"
-              >
-                <span className="text-emerald-700 font-bold mt-0.5">🛡️</span>
-                <span className="leading-relaxed">{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* 8. EXPERT ADVISORY */}
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <Info className="size-5 text-emerald-700 shrink-0 mt-0.5" />
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-stone-700">
-              {t.expertAdviceTitle}
+            <ShieldAlert className="size-4 text-amber-700" />
+            <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-stone-700">
+              Possible Causes & Triggers
             </h4>
-            <p className="mt-1 text-xs sm:text-sm leading-relaxed text-stone-600">
-              {expertNote}
+          </div>
+          {causesList.length > 0 ? (
+            <ul className="space-y-2">
+              {causesList.map((cause, idx) => (
+                <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-stone-800">
+                  <span className="size-1.5 rounded-full bg-amber-600 shrink-0 mt-1.5" />
+                  <span>{cause}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-stone-500">
+              {isHealthy
+                ? 'Proper soil nutrition, balanced moisture, and good farming practices maintain this healthy state.'
+                : 'Fungal or bacterial pathogens favored by warm temperature and surface leaf moisture.'}
             </p>
+          )}
+        </div>
+      </div>
+
+      {/* SECTION 5: AI-POWERED TREATMENT RECOMMENDATIONS */}
+      <div className="space-y-4">
+        <h3 className="font-mono text-lg font-bold text-stone-900">
+          Treatment & Action Plan
+        </h3>
+
+        {/* Immediate Actions */}
+        {immediateActionsList.length > 0 && (
+          <div className="rounded-2xl border-2 border-amber-500/25 bg-amber-50/30 p-5 sm:p-6 space-y-3 shadow-2xs">
+            <div className="border-b border-amber-200/60 pb-2.5">
+              <h4 className="font-mono text-sm sm:text-base font-bold text-amber-950">
+                Immediate Actions for Today
+              </h4>
+              <p className="text-xs text-amber-800/80">
+                Steps the farmer should take immediately to prevent further damage
+              </p>
+            </div>
+            <ol className="space-y-2.5">
+              {immediateActionsList.map((action, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-start gap-3 rounded-xl border border-amber-200/80 bg-white p-3.5 text-xs sm:text-sm text-stone-800"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white mt-0.5">
+                    {idx + 1}
+                  </span>
+                  <span className="flex-1 leading-relaxed">{action}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Treatment Recommendations (Organic & Chemical Guidelines) */}
+        {treatmentList.length > 0 && (
+          <div className="rounded-2xl border border-emerald-600/20 bg-emerald-50/20 p-5 sm:p-6 space-y-3 shadow-2xs">
+            <div className="border-b border-emerald-900/10 pb-2.5">
+              <h4 className="font-mono text-sm sm:text-base font-bold text-emerald-950">
+                Treatment & Remediation Options
+              </h4>
+              <p className="text-xs text-stone-500">
+                Safe organic remedies and approved agricultural controls
+              </p>
+            </div>
+            <ul className="space-y-2.5">
+              {treatmentList.map((treatment, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-start gap-2.5 rounded-xl border border-emerald-700/10 bg-white p-3 text-xs sm:text-sm text-stone-800"
+                >
+                  <span className="text-emerald-700 font-bold mt-0.5">🌿</span>
+                  <span className="leading-relaxed">{treatment}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Chemical Safety Box */}
+        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50/50 p-4 text-xs text-rose-950">
+          <AlertTriangle className="size-5 shrink-0 text-rose-600 mt-0.5" />
+          <div>
+            <span className="font-bold">Chemical Safety Warning: </span>
+            <span>
+              Never invent or exceed chemical dosages. Always read the product label, use approved personal protective equipment (mask and gloves), and follow local agricultural authority directions.
+            </span>
           </div>
         </div>
       </div>
 
-      {/* 9. BOTTOM ACTION: SCAN ANOTHER PLANT LEAF */}
+      {/* SECTION 6: PREVENTION & LONG-TERM MANAGEMENT */}
+      <div className="space-y-4">
+        <h3 className="font-mono text-lg font-bold text-stone-900">
+          Long-Term Crop Health Management
+        </h3>
+
+        {/* Prevention */}
+        {preventionList.length > 0 && (
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2 border-b border-stone-100 pb-2.5">
+              <ShieldCheck className="size-4 text-emerald-700" />
+              <div>
+                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-stone-800">
+                  Preventive Farming Practices
+                </h4>
+                <p className="text-xs text-stone-500">Best practices to stop infection from returning</p>
+              </div>
+            </div>
+            <ul className="space-y-2.5">
+              {preventionList.map((item, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-start gap-3 rounded-xl border border-stone-100 bg-stone-50/60 p-3 text-xs sm:text-sm text-stone-800"
+                >
+                  <span className="text-emerald-700 font-bold mt-0.5">🛡️</span>
+                  <span className="leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Farmer Advisory & Extension Officer Help */}
+        <div className="rounded-2xl border border-emerald-800/15 bg-emerald-50/60 p-5">
+          <div className="flex items-start gap-3">
+            <Info className="size-5 text-emerald-700 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                Farmer Advisory & Expert Support
+              </h4>
+              <p className="mt-1 text-xs sm:text-sm leading-relaxed text-stone-700">
+                {farmerAdvisory}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* BOTTOM ACTION: SCAN ANOTHER PLANT LEAF */}
       <div className="pt-4 border-t border-stone-100 flex flex-col sm:flex-row items-center justify-center gap-3">
         <button
           type="button"
@@ -1116,7 +1207,7 @@ function FarmerAnalysisReport({
           className="flex min-h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-8 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 transition cursor-pointer"
         >
           <Upload className="size-4" />
-          <span>{t.checkAnother}</span>
+          <span>Check Another Plant Leaf</span>
         </button>
       </div>
     </article>

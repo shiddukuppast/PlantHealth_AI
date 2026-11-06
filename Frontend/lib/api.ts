@@ -37,11 +37,17 @@ export type Prediction = {
   message: string | null
   ai_guidance: {
     summary: string
+    disease_overview?: string | null
     symptoms: string[]
-    recommended_actions: string[]
-    prevention: string[]
+    possible_causes?: string[]
     severity: string
-    when_to_seek_expert_help: string
+    severity_explanation?: string | null
+    immediate_actions?: string[]
+    treatment_recommendations?: string[]
+    prevention: string[]
+    farmer_advisory?: string | null
+    recommended_actions: string[]
+    when_to_seek_expert_help?: string | null
     weather_insight?: string | null
   } | null
   weather_context?: WeatherContext | null

@@ -26,32 +26,64 @@ def _parse_guidance_content(content: str) -> dict[str, Any]:
         cleaned = "\n".join(lines).strip()
 
     guidance = json.loads(cleaned)
-    required_keys = {
-        "summary",
-        "symptoms",
-        "recommended_actions",
-        "prevention",
-        "severity",
-        "when_to_seek_expert_help",
-    }
-    if (
-        not isinstance(guidance, dict)
-        or not required_keys.issubset(guidance)
-        or not isinstance(guidance["summary"], str)
-        or not isinstance(guidance["symptoms"], list)
-        or not isinstance(guidance["recommended_actions"], list)
-        or not isinstance(guidance["prevention"], list)
-        or not isinstance(guidance["severity"], str)
-        or not isinstance(guidance["when_to_seek_expert_help"], str)
-    ):
-        raise ValueError("LLM response is missing required guidance fields.")
+    if not isinstance(guidance, dict):
+        raise ValueError("LLM response is not a JSON object")
 
-    if "weather_insight" in guidance and guidance["weather_insight"] is not None:
-        guidance["weather_insight"] = str(guidance["weather_insight"]).strip()
+    def clean_str(val: Any, default: str = "") -> str:
+        return str(val).strip() if val is not None else default
+
+    def clean_list(val: Any) -> list[str]:
+        if isinstance(val, list):
+            return [str(item).strip() for item in val if str(item).strip()]
+        if isinstance(val, str) and val.strip():
+            return [val.strip()]
+        return []
+
+    summary = clean_str(guidance.get("summary"))
+    disease_overview = clean_str(guidance.get("disease_overview"))
+    symptoms = clean_list(guidance.get("symptoms"))
+    possible_causes = clean_list(guidance.get("possible_causes"))
+
+    raw_severity = clean_str(guidance.get("severity"), default="Medium")
+    if "high" in raw_severity.lower():
+        severity = "High"
+    elif "low" in raw_severity.lower():
+        severity = "Low"
     else:
-        guidance["weather_insight"] = None
+        severity = "Medium"
 
-    return guidance
+    severity_explanation = clean_str(guidance.get("severity_explanation"))
+    immediate_actions = clean_list(guidance.get("immediate_actions"))
+    treatment_recommendations = clean_list(guidance.get("treatment_recommendations"))
+    prevention = clean_list(guidance.get("prevention"))
+    farmer_advisory = clean_str(guidance.get("farmer_advisory"))
+    when_to_seek = clean_str(guidance.get("when_to_seek_expert_help"))
+
+    recommended_actions = clean_list(guidance.get("recommended_actions"))
+    if not recommended_actions:
+        recommended_actions = immediate_actions + treatment_recommendations
+    if not immediate_actions and recommended_actions:
+        immediate_actions = recommended_actions[:3]
+    if not treatment_recommendations and len(recommended_actions) > 3:
+        treatment_recommendations = recommended_actions[3:]
+
+    weather_insight = clean_str(guidance.get("weather_insight")) or None
+
+    return {
+        "summary": summary or disease_overview or "Plant health analysis completed.",
+        "disease_overview": disease_overview or summary,
+        "symptoms": symptoms,
+        "possible_causes": possible_causes,
+        "severity": severity,
+        "severity_explanation": severity_explanation,
+        "immediate_actions": immediate_actions,
+        "treatment_recommendations": treatment_recommendations,
+        "prevention": prevention,
+        "farmer_advisory": farmer_advisory or when_to_seek,
+        "recommended_actions": recommended_actions,
+        "when_to_seek_expert_help": when_to_seek or farmer_advisory,
+        "weather_insight": weather_insight,
+    }
 
 
 def _request_guidance(payload: dict[str, Any]) -> dict[str, Any]:
@@ -70,13 +102,13 @@ def _request_guidance(payload: dict[str, Any]) -> dict[str, Any]:
         if wc.get("feels_like") is not None:
             weather_parts.append(f"Feels like: {wc['feels_like']}°C")
         if wc.get("humidity") is not None:
-            weather_parts.append(f"Humidity: {wc['humidity']}%")
+            weather_parts.append(f"Relative humidity: {wc['humidity']}%")
         if wc.get("condition"):
             weather_parts.append(f"Weather condition: {wc['condition']}")
         if wc.get("rainfall") is not None and wc.get("rainfall") > 0:
-            weather_parts.append(f"Rain/precipitation: {wc['rainfall']} mm")
+            weather_parts.append(f"Rainfall: {wc['rainfall']} mm")
         if wc.get("wind_speed") is not None:
-            weather_parts.append(f"Wind: {wc['wind_speed']} m/s")
+            weather_parts.append(f"Wind speed: {wc['wind_speed']} m/s")
         if wc.get("cloud_coverage") is not None:
             weather_parts.append(f"Cloud coverage: {wc['cloud_coverage']}%")
         if wc.get("location"):
@@ -85,39 +117,44 @@ def _request_guidance(payload: dict[str, Any]) -> dict[str, Any]:
     weather_text = "\n".join(weather_parts) if weather_parts else "Weather data unavailable."
 
     prompt = (
-        "You provide cautious, farmer-friendly plant health guidance.\n\n"
+        "You are an experienced agricultural scientist and agronomy advisory specialist providing practical, farmer-friendly plant health guidance.\n\n"
         "AUTHORITATIVE CLASSIFICATION:\n"
         "The supplied diagnosis (type, condition, confidence) comes strictly from an authoritative ML image classifier. "
-        "You must NEVER change, question, or replace that prediction. Always explain the exact diagnosed condition. "
-        "Respect low confidence without claiming certainty.\n\n"
-        "WEATHER CONTEXT & INTERPRETATION RULES:\n"
-        "- Weather is supplementary context, NOT the primary cause. Never claim that weather caused the disease "
-        "(e.g., say 'wet and humid conditions can favor the development and spread of late blight', "
-        "NOT 'the rain caused your late blight').\n"
-        "- Weather relevance: Only mention weather when it is actually relevant to the condition. "
-        "For fungal diseases, humid or wet conditions may be highly relevant. For pests, temperature and humidity may influence activity. "
-        "For other conditions or when weather is not a major factor, be concise in weather_insight: "
-        "'Current weather conditions do not appear to be a major factor for this diagnosis.'\n"
-        "- Weather-aware recommendations: When weather is relevant, make recommended actions context-aware "
-        "(e.g., avoid overhead watering in high humidity, improve ventilation, monitor adjacent plants).\n"
-        "- Safety: Do not prescribe pesticide or fungicide dosages. Encourage following local agricultural advice "
-        "and consulting an extension officer for chemical recommendations.\n\n"
-        "Return valid JSON with exactly these keys:\n"
-        "- summary (string): Clear, concise explanation of the diagnosed condition.\n"
-        "- weather_insight (string or null): If weather is available, a 1-2 sentence context insight explaining how current weather "
-        "can favor disease spread, pest activity, or plant stress (or concisely stating it is not a major factor). "
-        "If weather is unavailable, return null.\n"
-        "- symptoms (array of strings): Common observable symptoms.\n"
-        "- recommended_actions (array of strings): Practical management actions, adapted to weather when relevant.\n"
-        "- prevention (array of strings): Preventive agricultural practices.\n"
-        "- severity (string): Severity level (e.g. Low, Medium, High).\n"
-        "- when_to_seek_expert_help (string): Clear guidance on when to consult an agronomist.\n\n"
+        "You must NEVER change, question, or replace that prediction. Always explain the exact diagnosed condition.\n\n"
+        "CRITICAL RULES:\n"
+        "1. Safety & Chemical Dosages: NEVER invent or prescribe specific unverified chemical dosages or concentrations. "
+        "Recommend standard approved organic remedies (e.g., neem oil spray, trichoderma) and general chemical classes (e.g., copper-based fungicides) "
+        "with explicit instructions to follow manufacturer labels and wear protective gear.\n"
+        "2. Healthy Crops: If the detected condition indicates healthy (e.g. 'healthy'), celebrate the healthy condition. "
+        "Provide maintenance, nutrient management, and monitoring advice rather than disease treatments. Severity must be 'Low'.\n"
+        "3. Low Confidence: If low_confidence is true or confidence is below 70%, advise the farmer to inspect other leaves "
+        "or consult a local Krishi Vigyan Kendra (KVK) / agricultural extension officer for on-field confirmation.\n"
+        "4. Weather Context: Weather is supplementary environmental context, NOT the primary root cause. "
+        "Explain how temperature/humidity/rainfall might favor or hinder pathogen growth (e.g., 'Warm and humid conditions favor fungal spore germination'). "
+        "If weather is unavailable or irrelevant, set weather_insight to null.\n"
+        "5. Farmer-Friendly Tone: Use simple, encouraging, respectful language suitable for Indian farmers.\n\n"
+        "Return ONLY a valid JSON object with EXACTLY the following keys:\n"
+        "{\n"
+        '  "summary": "Crisp 1-2 sentence overall diagnosis summary",\n'
+        '  "disease_overview": "Detailed explanation of what the condition is, affected plant parts (leaves, stems, fruit), and how it spreads",\n'
+        '  "symptoms": ["Observable visual symptom 1", "Observable visual symptom 2", "Observable visual symptom 3"],\n'
+        '  "possible_causes": ["Causal pathogen or physiological stress", "Favorable environmental factors"],\n'
+        '  "severity": "Low | Medium | High",\n'
+        '  "severity_explanation": "Clear explanation of potential crop loss and urgency if left unmanaged",\n'
+        '  "immediate_actions": ["Immediate step 1 (e.g., isolate infected plant parts)", "Immediate step 2 (e.g., sanitize pruning shears)", "Immediate step 3 (e.g., adjust irrigation)"],\n'
+        '  "treatment_recommendations": ["Safe organic remedy or cultural control", "Approved agricultural treatment with safety precautions (refer to product label)"],\n'
+        '  "prevention": ["Crop rotation practice", "Resistant varieties / clean seed stock", "Soil & moisture management"],\n'
+        '  "farmer_advisory": "Simple, practical closing advice for the farmer, including when to contact the local agricultural extension officer",\n'
+        '  "recommended_actions": ["Combined practical action 1", "Combined practical action 2"],\n'
+        '  "when_to_seek_expert_help": "Specific conditions under which the farmer should visit the nearest agricultural center",\n'
+        '  "weather_insight": "1-2 sentence insight on how current weather impacts this crop condition, or null if weather is not available"\n'
+        "}\n\n"
         "Diagnostic Details:\n"
-        f"Detected type: {payload.get('type')}\n"
-        f"Detected condition: {payload.get('class_name')}\n"
-        f"ML confidence: {payload.get('confidence')}\n"
-        f"Low confidence flag: {payload.get('low_confidence')}\n\n"
-        f"Current Weather Context:\n{weather_text}"
+        f"- Crop type: {payload.get('type')}\n"
+        f"- Diagnosed condition: {payload.get('class_name')}\n"
+        f"- ML Model confidence: {payload.get('confidence')}\n"
+        f"- Low confidence flag: {payload.get('low_confidence')}\n\n"
+        f"Current Local Weather Context:\n{weather_text}"
     )
 
     request_body = json.dumps(
@@ -127,7 +164,7 @@ def _request_guidance(payload: dict[str, Any]) -> dict[str, Any]:
             "messages": [
                 {
                     "role": "system",
-                    "content": "Return only the requested JSON object.",
+                    "content": "You are a professional agricultural advisor. Return only the requested JSON object.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -139,7 +176,7 @@ def _request_guidance(payload: dict[str, Any]) -> dict[str, Any]:
         headers={
             "Authorization": f"Bearer {settings.llm_api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "PlantHealthAI/1.0",
+            "User-Agent": "PlantHealthAI/2.0",
         },
         method="POST",
     )
