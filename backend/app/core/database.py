@@ -1,3 +1,4 @@
+from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.core.config import get_settings
@@ -9,9 +10,11 @@ database: AsyncIOMotorDatabase | None = None
 async def connect_to_mongo() -> None:
     global client, database
     settings = get_settings()
-    client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000)
+    temp_client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000)
+    await temp_client.admin.command("ping")
+
+    client = temp_client
     database = client[settings.database_name]
-    await client.admin.command("ping")
 
     users = database["users"]
     predictions = database["predictions"]
@@ -29,7 +32,10 @@ async def close_mongo_connection() -> None:
 
 def get_database() -> AsyncIOMotorDatabase:
     if database is None:
-        raise RuntimeError("Database is not connected.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service is unavailable. Please verify your MongoDB configuration.",
+        )
     return database
 
 

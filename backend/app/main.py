@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -13,10 +14,18 @@ from app.routes.user_route import router as user_router
 from app.routes.weather_route import router as weather_router
 from app.services import model_service
 
+logger = logging.getLogger("uvicorn.error")
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await connect_to_mongo()
+    try:
+        await connect_to_mongo()
+    except Exception as exc:
+        logger.error(
+            "MongoDB connection failed during startup: %s. Continuing with database disconnected.",
+            exc,
+        )
     model_service.load_model_once()
     yield
     await close_mongo_connection()

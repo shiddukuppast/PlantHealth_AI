@@ -33,7 +33,7 @@ export function SignupForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="w-full max-w-md rounded-[2rem] border border-border bg-card p-7 shadow-[0_24px_70px_-32px_rgba(25,76,46,0.35)] sm:p-10">
-      <div className="mb-8 flex items-center gap-3"><span className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><Leaf className="size-6" /></span><span className="font-mono text-sm font-bold tracking-tight text-foreground">PlantGuard AI</span></div>
+      <div className="mb-8 flex items-center gap-3"><span className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><Leaf className="size-6" /></span><span className="font-mono text-sm font-bold tracking-tight text-foreground">PlantHealth AI</span></div>
       <h1 className="font-mono text-3xl font-bold tracking-tight text-foreground">Create your account</h1>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">Start protecting your plants with AI-powered insights.</p>
       <form onSubmit={submit} className="mt-8 space-y-5">

@@ -6,7 +6,10 @@ import './globals.css'
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
-export const metadata: Metadata = { title: 'PlantGuard AI · Plant Disease Detection', description: 'AI-powered plant disease detection from a single leaf image.', generator: 'v0.app' }
+export const metadata: Metadata = {
+  title: 'PlantHealth AI · Farmer Crop Health & Disease Diagnosis',
+  description: 'AI-powered crop health and plant disease detection for farmers.',
+}
 export const viewport: Viewport = { colorScheme: 'light', themeColor: '#f5f8f2', userScalable: false }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

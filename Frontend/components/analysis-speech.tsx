@@ -8,6 +8,11 @@ export type AnalysisSpeechProps = {
   prediction: Prediction
   aiGuidance?: Prediction['ai_guidance']
   className?: string
+  playLabel?: string
+  speakingLabel?: string
+  pauseLabel?: string
+  resumeLabel?: string
+  stopLabel?: string
 }
 
 type SpeechState = 'idle' | 'speaking' | 'paused'
@@ -132,7 +137,7 @@ export function buildSpeechChunks(
 ): string[] {
   if (!prediction.input_valid) {
     return [
-      'PlantGuard could not confidently identify a plant disease or pest from this image. Please upload a clear image of a plant leaf.'
+      'PlantHealth AI could not confidently identify a plant disease or pest from this image. Please upload a clear image of a plant leaf.'
     ]
   }
 
@@ -299,6 +304,11 @@ export function AnalysisSpeech({
   prediction,
   aiGuidance,
   className = '',
+  playLabel = 'Listen to Advice',
+  speakingLabel = 'Speaking...',
+  pauseLabel = 'Pause',
+  resumeLabel = 'Resume',
+  stopLabel = 'Stop',
 }: AnalysisSpeechProps) {
   const [speechState, setSpeechState] = useState<SpeechState>('idle')
   const [hasPlayed, setHasPlayed] = useState(false)
@@ -464,7 +474,7 @@ export function AnalysisSpeech({
           className="inline-flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/15 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <Volume2 className="size-4" />
-          <span>{hasPlayed ? 'Listen Again' : 'Listen to Analysis'}</span>
+          <span>{playLabel}</span>
         </button>
       )}
 
@@ -472,7 +482,7 @@ export function AnalysisSpeech({
         <>
           <div className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-xs animate-pulse">
             <Volume2 className="size-4" />
-            <span>Speaking...</span>
+            <span>{speakingLabel}</span>
           </div>
           <button
             type="button"
@@ -481,7 +491,7 @@ export function AnalysisSpeech({
             className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-medium text-foreground transition hover:bg-secondary cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <Pause className="size-4" />
-            <span>Pause</span>
+            <span>{pauseLabel}</span>
           </button>
           <button
             type="button"
@@ -490,7 +500,7 @@ export function AnalysisSpeech({
             className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-medium text-foreground transition hover:bg-secondary cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <Square className="size-4" />
-            <span>Stop</span>
+            <span>{stopLabel}</span>
           </button>
         </>
       )}
@@ -499,7 +509,7 @@ export function AnalysisSpeech({
         <>
           <div className="inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2.5 text-sm font-semibold text-secondary-foreground border border-border">
             <VolumeX className="size-4" />
-            <span>Paused</span>
+            <span>{pauseLabel}</span>
           </div>
           <button
             type="button"
@@ -508,7 +518,7 @@ export function AnalysisSpeech({
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <Play className="size-4" />
-            <span>Resume</span>
+            <span>{resumeLabel}</span>
           </button>
           <button
             type="button"
@@ -517,7 +527,7 @@ export function AnalysisSpeech({
             className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-medium text-foreground transition hover:bg-secondary cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <Square className="size-4" />
-            <span>Stop</span>
+            <span>{stopLabel}</span>
           </button>
         </>
       )}
