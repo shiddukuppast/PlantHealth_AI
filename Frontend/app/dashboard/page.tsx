@@ -22,12 +22,11 @@ import {
 import { ApiError, fetchWeather, getCurrentUser, logout, predictDisease, Prediction, Weather } from '@/lib/api'
 import CameraCapture from '@/components/camera-capture'
 import AnalysisSpeech from '@/components/analysis-speech'
-import FieldIntelligence from '@/components/field-intelligence'
 
 const MAX_SIZE = 10 * 1024 * 1024
 const TYPES = ['image/jpeg', 'image/png']
 
-export function formatConditionName(raw: string): string {
+function formatConditionName(raw: string): string {
   if (!raw) return ''
 
   // 1. Normalize dataset delimiters
@@ -415,7 +414,6 @@ function AnalysisReport({
   preview: string
   onReset: () => void
 }) {
-  const [fieldIntelligenceOpen, setFieldIntelligenceOpen] = useState(false)
 
   if (!prediction.input_valid) {
     return (
@@ -481,13 +479,6 @@ function AnalysisReport({
   const importantNote =
     guidance?.when_to_seek_expert_help ||
     'If symptoms rapidly progress, yield drops sharply, or you are unsure about the diagnosis, contact your local agricultural advisor for confirmation and tailored management.'
-
-  const shouldShowFieldSpread =
-    prediction.input_valid &&
-    !prediction.low_confidence &&
-    (prediction.type === 'Disease' || prediction.type === 'Pest') &&
-    !/healthy|no disease|no issue/i.test(prediction.class_name || '') &&
-    !/healthy|no disease|no issue/i.test(prediction.type || '')
 
   return (
     <article className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-6 sm:p-10 shadow-sm transition-all">
@@ -724,44 +715,7 @@ function AnalysisReport({
         />
       </div>
 
-      {!fieldIntelligenceOpen && shouldShowFieldSpread && (
-        <div className="mt-6 rounded-2xl border border-border bg-secondary/20 p-5 sm:p-6">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              🗺️
-            </span>
-            <div className="flex-1">
-              <h4 className="font-mono text-lg font-bold text-foreground">
-                Check Probable Field Spread
-              </h4>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Want to see which areas of your field may need inspection first?
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setFieldIntelligenceOpen(true)}
-            className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-          >
-            <span aria-hidden="true">🗺️</span>
-            Check Probable Field Spread
-          </button>
-        </div>
-      )}
-
-      {fieldIntelligenceOpen && (
-        <div className="mt-6">
-          <FieldIntelligence
-            conditionName={formattedCondition}
-            conditionType={prediction.type}
-            onBack={() => setFieldIntelligenceOpen(false)}
-          />
-        </div>
-      )}
-
-      {/* 8. ANALYZE ANOTHER IMAGE */}
+      {/* 9. ANALYZE ANOTHER IMAGE */}
       <div className="mt-8 pt-4 border-t border-border flex flex-col sm:flex-row items-center justify-center gap-3">
         <button
           onClick={onReset}
