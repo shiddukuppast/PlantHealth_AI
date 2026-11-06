@@ -1,7 +1,7 @@
 Dataset/
 PlantVillage/
 PestDataset/
-.env
+backend/.env
 __pycache__/
 *.pyc
 venv/
